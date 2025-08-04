@@ -35,9 +35,10 @@
             padding: 15px 25px; font-size: 1.1em; font-weight: bold; border-radius: 8px;
             cursor: pointer; width: 100%; transition: background-color 0.3s; margin-top: 10px;
         }
-        .btn:hover { background-color: #2980b9; }
+        .btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        .btn:hover:not(:disabled) { background-color: #2980b9; }
         .btn-share { background-color: var(--secondary-color); }
-        .btn-share:hover { background-color: #27ae60; }
+        .btn-share:hover:not(:disabled) { background-color: #27ae60; }
         #quiz-page { text-align: left; }
         .progress-container { margin-bottom: 20px; }
         .progress-bar { width: 100%; background-color: var(--border-color); border-radius: 5px; height: 10px; }
@@ -69,11 +70,17 @@
         }
         #leaderboard li:first-child { background-color: var(--gold-color); color: var(--white-color); border-color: #d4a20b; }
         .hidden { display: none; }
+        .loader {
+            border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid var(--primary-color);
+            width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
     <div class="container">
+        <!-- Page 1: Creator's Name -->
         <div id="name-page">
             <h1>Friendship Quiz Challenge</h1>
             <p>Enter your name to create your own quiz!</p>
@@ -81,6 +88,7 @@
             <button id="start-btn" class="btn">Create My Quiz</button>
         </div>
         
+        <!-- Page 1.5: Friend's Name -->
         <div id="friend-name-page" class="hidden">
             <h2 id="friend-prompt-heading"></h2>
             <p>Enter your name to start the quiz!</p>
@@ -88,14 +96,18 @@
             <button id="start-friend-quiz-btn" class="btn">Take the Quiz!</button>
         </div>
 
+        <!-- Page 2: The Quiz -->
         <div id="quiz-page" class="hidden">
             <div class="progress-container">
                 <div id="progress-text"></div>
                 <div class="progress-bar"><div class="progress-bar-inner"></div></div>
             </div>
-            <div id="question-container"></div>
+            <div id="question-container">
+                <div class="loader"></div>
+            </div>
         </div>
         
+        <!-- Page 3: Share Link Page -->
         <div id="share-page" class="hidden">
              <h2 id="share-heading"></h2>
              <p>Share this link with your friends to test them!</p>
@@ -103,6 +115,7 @@
              <a id="whatsapp-share-btn" class="btn btn-share" href="#" target="_blank">🚀 Share on WhatsApp</a>
         </div>
 
+        <!-- Page 4: Results Page -->
         <div id="results-page" class="hidden">
             <h2 id="results-heading"></h2>
             <p id="score"></p>
@@ -111,6 +124,7 @@
             <div id="leaderboard-section" class="hidden">
                 <h3>🏆 Leaderboard</h3>
                 <ul id="leaderboard"></ul>
+                <div id="leaderboard-loader" class="loader hidden"></div>
             </div>
             
             <hr style="margin: 25px 0; border: 1px solid #eee;">
@@ -119,8 +133,27 @@
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', () => {
+    <!-- Firebase SDK -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+      import { getFirestore, collection, doc, setDoc, getDoc, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+      // Your web app's Firebase configuration
+      const firebaseConfig = {
+        apiKey: "AIzaSyAoh37dJCcFjw9Lce8xKvHBpKm7TqYep2M",
+        authDomain: "aidata-1d74f.firebaseapp.com",
+        projectId: "aidata-1d74f",
+        storageBucket: "aidata-1d74f.appspot.com",
+        messagingSenderId: "12946555542",
+        appId: "1:12946555542:web:a733c78857d9da5633b8b7"
+      };
+
+      // Initialize Firebase
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      // --- Main App Logic ---
+      document.addEventListener('DOMContentLoaded', () => {
             const namePage = document.getElementById('name-page');
             const friendNamePage = document.getElementById('friend-name-page');
             const quizPage = document.getElementById('quiz-page');
@@ -132,7 +165,6 @@
             const startBtn = document.getElementById('start-btn');
             const startFriendQuizBtn = document.getElementById('start-friend-quiz-btn');
 
-            // Replace with your own image URLs
             const questions = [
                 {
                     q: (name) => `What is ${name}'s favorite color?`,
@@ -172,21 +204,32 @@
                 }
             ];
             
-            let currentQuestionIndex, userAnswers, quizMode, userName, friendName, friendCorrectAnswers, attendees;
+            let currentQuestionIndex, userAnswers, quizMode, userName, friendName, quizData;
+            let currentQuizId = null;
 
             const params = new URLSearchParams(window.location.search);
-            const nameFromUrl = params.get('name');
-            const answersFromUrl = params.get('a');
-            const attendeesFromUrl = params.get('att');
+            const quizIdFromUrl = params.get('quizId');
 
-            if (nameFromUrl && answersFromUrl) {
-                quizMode = 'friend';
-                userName = nameFromUrl;
-                friendCorrectAnswers = answersFromUrl;
-                attendees = attendeesFromUrl ? JSON.parse(atob(attendeesFromUrl)) : [];
-                document.getElementById('friend-prompt-heading').innerText = `You've been challenged by ${userName}!`;
-                namePage.classList.add('hidden');
-                friendNamePage.classList.remove('hidden');
+            if (quizIdFromUrl) {
+                currentQuizId = quizIdFromUrl;
+                loadQuizForFriend(currentQuizId);
+            }
+
+            async function loadQuizForFriend(quizId) {
+                const docRef = doc(db, "quizzes", quizId);
+                const docSnap = await getDoc(docRef);
+
+                if (docSnap.exists()) {
+                    quizData = docSnap.data();
+                    userName = quizData.creatorName;
+                    quizMode = 'friend';
+                    document.getElementById('friend-prompt-heading').innerText = `You've been challenged by ${userName}!`;
+                    namePage.classList.add('hidden');
+                    friendNamePage.classList.remove('hidden');
+                } else {
+                    alert("Quiz not found! It may have been deleted.");
+                    window.location.href = window.location.pathname;
+                }
             }
 
             startBtn.addEventListener('click', () => {
@@ -244,40 +287,84 @@
                 quizMode === 'creator' ? finishCreatorQuiz() : finishFriendQuiz();
             }
             
-            function finishCreatorQuiz() {
-                document.getElementById('share-heading').innerText = `${userName}, Your Quiz is Ready!`;
-                const answersString = userAnswers.join('');
-                const link = `${window.location.origin}${window.location.pathname}?name=${encodeURIComponent(userName)}&a=${answersString}`;
-                document.getElementById('share-link-container').innerText = link;
-                const whatsappMsg = encodeURIComponent(`${userName} has challenged you to a friendship quiz! 🤔 See if you really know them. Click the link: ${link}`);
-                document.getElementById('whatsapp-share-btn').href = `https://api.whatsapp.com/send?text=${whatsappMsg}`;
+            async function finishCreatorQuiz() {
+                const shareButton = document.getElementById('whatsapp-share-btn');
+                shareButton.disabled = true;
+                document.getElementById('share-heading').innerText = `Generating your quiz...`;
                 sharePage.classList.remove('hidden');
+                
+                const answersString = userAnswers.join('');
+                try {
+                    const docRef = await addDoc(collection(db, "quizzes"), {
+                        creatorName: userName,
+                        answers: answersString,
+                        createdAt: new Date()
+                    });
+                    currentQuizId = docRef.id;
+                    
+                    document.getElementById('share-heading').innerText = `${userName}, Your Quiz is Ready!`;
+                    const link = `${window.location.origin}${window.location.pathname}?quizId=${currentQuizId}`;
+                    document.getElementById('share-link-container').innerText = link;
+                    const whatsappMsg = encodeURIComponent(`${userName} has challenged you to a friendship quiz! 🤔 See if you really know them. Click the link: ${link}`);
+                    shareButton.href = `https://api.whatsapp.com/send?text=${whatsappMsg}`;
+                    shareButton.disabled = false;
+
+                } catch (e) {
+                    console.error("Error adding document: ", e);
+                    alert("Could not create quiz. Please check your connection and try again.");
+                }
             }
 
-            function finishFriendQuiz() {
+            async function finishFriendQuiz() {
                 let score = 0;
                 let resultsHTML = '<ul>';
+                const correctAnswers = quizData.answers;
                 questions.forEach((q, i) => {
-                    const isCorrect = userAnswers[i] === friendCorrectAnswers[i];
+                    const isCorrect = userAnswers[i] === correctAnswers[i];
                     if (isCorrect) score++;
-                    resultsHTML += `<li class="${isCorrect ? 'correct' : 'wrong'}"><p>${q.q(userName)}</p><p>You guessed: <b>${q.options[userAnswers[i]].text}</b> ${isCorrect ? '✔' : `✖ (Correct: <b>${q.options[friendCorrectAnswers[i]].text}</b>)`}</p></li>`;
+                    resultsHTML += `<li class="${isCorrect ? 'correct' : 'wrong'}"><p>${q.q(userName)}</p><p>You guessed: <b>${q.options[userAnswers[i]].text}</b> ${isCorrect ? '✔' : `✖ (Correct: <b>${q.options[correctAnswers[i]].text}</b>)`}</p></li>`;
                 });
                 resultsHTML += '</ul>';
                 
                 document.getElementById('results-container').innerHTML = resultsHTML;
                 document.getElementById('results-heading').innerText = `Here's your result, ${friendName}!`;
                 document.getElementById('score').innerHTML = `You scored <b>${score} out of ${questions.length}</b>.`;
-
-                attendees.push({ name: friendName, score: score });
-                attendees.sort((a, b) => b.score - a.score); // Sort by score descending
-                
-                const leaderboardList = document.getElementById('leaderboard');
-                leaderboardList.innerHTML = attendees.map(p => `<li><span>${p.name}</span><span>${p.score}/${questions.length}</span></li>`).join('');
-                document.getElementById('leaderboard-section').classList.remove('hidden');
-
                 resultsPage.classList.remove('hidden');
+                
+                try {
+                    await addDoc(collection(db, "quizzes", currentQuizId, "leaderboard"), {
+                        name: friendName,
+                        score: score,
+                        createdAt: new Date()
+                    });
+                } catch (e) {
+                    console.error("Error adding to leaderboard: ", e);
+                }
+
+                displayLeaderboard();
             }
-        });
+
+            async function displayLeaderboard() {
+                const leaderboardSection = document.getElementById('leaderboard-section');
+                const loader = document.getElementById('leaderboard-loader');
+                leaderboardSection.classList.remove('hidden');
+                loader.classList.remove('hidden');
+
+                const leaderboardList = document.getElementById('leaderboard');
+                const q = query(collection(db, "quizzes", currentQuizId, "leaderboard"));
+                const querySnapshot = await getDocs(q);
+                
+                let attendees = [];
+                querySnapshot.forEach((doc) => {
+                    attendees.push(doc.data());
+                });
+
+                attendees.sort((a, b) => b.score - a.score || a.createdAt - b.createdAt);
+                
+                leaderboardList.innerHTML = attendees.map(p => `<li><span>${p.name}</span><span>${p.score}/${questions.length}</span></li>`).join('');
+                loader.classList.add('hidden');
+            }
+      });
     </script>
 </body>
 </html>
