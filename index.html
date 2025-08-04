@@ -8,7 +8,7 @@
         :root {
             --primary-color: #3498db; --secondary-color: #2ecc71; --light-bg: #f0f4f8;
             --dark-text: #2c3e50; --white-color: #ffffff; --danger-color: #e74c3c;
-            --border-color: #dfe6e9; --gold-color: #f1c40f;
+            --border-color: #dfe6e9; --gold-color: #f1c40f; --ai-purple: #9b59b6;
         }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -44,6 +44,12 @@
             color: var(--primary-color);
             border: 2px solid var(--primary-color);
         }
+        .btn-ai {
+            background-color: var(--ai-purple);
+            border-color: var(--ai-purple);
+            color: white;
+        }
+        .btn-ai:hover:not(:disabled) { background-color: #8e44ad; }
         .btn-secondary:hover:not(:disabled) { background-color: #eaf5fc; }
 
         #quiz-page { text-align: left; }
@@ -59,7 +65,7 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.05);
         }
         .option-card:hover { transform: translateY(-5px); box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .option-card img { width: 100%; height: 120px; object-fit: cover; display: block; }
+        .option-card img { width: 100%; height: 120px; object-fit: cover; display: block; background-color: #eee; }
         .option-card span { display: block; padding: 15px 10px; font-weight: bold; text-align: center; }
         #share-link-container {
             margin-top: 20px; padding: 15px; background-color: #f8f9f9; border-radius: 8px;
@@ -83,7 +89,6 @@
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         
-        /* Modal Styles */
         .modal {
             position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%;
             overflow: auto; background-color: rgba(0,0,0,0.5);
@@ -99,20 +104,23 @@
             position: absolute; top: 10px; right: 20px;
         }
         .close-btn:hover, .close-btn:focus { color: black; text-decoration: none; cursor: pointer; }
+        #ai-analysis-box {
+            background-color: #f5f0f7; border: 2px solid var(--ai-purple); border-radius: 8px;
+            padding: 15px; margin-top: 20px; text-align: left;
+        }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <!-- Page 1: Creator's Name -->
         <div id="name-page">
             <h1>Friendship Quiz Challenge</h1>
             <p>Enter your name to create your own quiz!</p>
             <input type="text" id="name-input" class="input-field" placeholder="Enter Your Name">
-            <button id="start-btn" class="btn">Create My Quiz</button>
+            <button id="start-btn" class="btn">Create Standard Quiz</button>
+            <button id="ai-generate-btn" class="btn btn-ai">✨ Generate AI Questions</button>
         </div>
         
-        <!-- Page 1.5: Friend's Name -->
         <div id="friend-name-page" class="hidden">
             <h2 id="friend-prompt-heading"></h2>
             <p>Enter your name to start the quiz!</p>
@@ -121,18 +129,14 @@
             <button id="view-leaderboard-btn" class="btn btn-secondary">View Leaderboard</button>
         </div>
 
-        <!-- Page 2: The Quiz -->
         <div id="quiz-page" class="hidden">
             <div class="progress-container">
                 <div id="progress-text"></div>
                 <div class="progress-bar"><div class="progress-bar-inner"></div></div>
             </div>
-            <div id="question-container">
-                <div class="loader"></div>
-            </div>
+            <div id="question-container"><div class="loader"></div></div>
         </div>
         
-        <!-- Page 3: Share Link Page -->
         <div id="share-page" class="hidden">
              <h2 id="share-heading"></h2>
              <p>Share this link with your friends to test them!</p>
@@ -140,11 +144,12 @@
              <a id="whatsapp-share-btn" class="btn btn-share" href="#" target="_blank">🚀 Share on WhatsApp</a>
         </div>
 
-        <!-- Page 4: Results Page -->
         <div id="results-page" class="hidden">
             <h2 id="results-heading"></h2>
             <p id="score"></p>
             <div id="results-container"></div>
+            <button id="ai-analysis-btn" class="btn btn-ai hidden">✨ Get Friendship Analysis</button>
+            <div id="ai-analysis-box" class="hidden"></div>
             
             <div id="leaderboard-section" class="hidden">
                 <h3>🏆 Leaderboard</h3>
@@ -158,7 +163,6 @@
         </div>
     </div>
 
-    <!-- Leaderboard Modal -->
     <div id="leaderboard-modal" class="modal hidden">
         <div class="modal-content">
             <span id="close-modal-btn" class="close-btn">&times;</span>
@@ -168,10 +172,9 @@
         </div>
     </div>
 
-    <!-- Firebase SDK -->
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-      import { getFirestore, collection, doc, setDoc, getDoc, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+      import { getFirestore, collection, doc, getDoc, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
       const firebaseConfig = {
         apiKey: "AIzaSyAoh37dJCcFjw9Lce8xKvHBpKm7TqYep2M",
@@ -185,7 +188,6 @@
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
 
-      // --- Main App Logic ---
       document.addEventListener('DOMContentLoaded', () => {
             const namePage = document.getElementById('name-page');
             const friendNamePage = document.getElementById('friend-name-page');
@@ -196,53 +198,25 @@
             const nameInput = document.getElementById('name-input');
             const friendNameInput = document.getElementById('friend-name-input');
             const startBtn = document.getElementById('start-btn');
+            const aiGenerateBtn = document.getElementById('ai-generate-btn');
             const startFriendQuizBtn = document.getElementById('start-friend-quiz-btn');
             
             const viewLeaderboardBtn = document.getElementById('view-leaderboard-btn');
             const leaderboardModal = document.getElementById('leaderboard-modal');
             const closeModalBtn = document.getElementById('close-modal-btn');
+            const aiAnalysisBtn = document.getElementById('ai-analysis-btn');
+            const aiAnalysisBox = document.getElementById('ai-analysis-box');
 
-            const questions = [
-                {
-                    q: (name) => `What is ${name}'s favorite color?`,
-                    options: [
-                        { text: 'Red', image: 'https://i.postimg.cc/P5B29s4x/red.png' },
-                        { text: 'Blue', image: 'https://i.postimg.cc/C1QCSkG1/blue.png' },
-                        { text: 'White', image: 'https://i.postimg.cc/d1yY2W9L/white.jpg' },
-                        { text: 'Black', image: 'https://i.postimg.cc/tJ019Rk7/black.jpg' }
-                    ]
-                },
-                {
-                    q: (name) => `What is ${name}'s favorite season?`,
-                    options: [
-                        { text: 'Summer', image: 'https://i.postimg.cc/7LQKd437/images.jpg' },
-                        { text: 'Winter', image: 'https://i.postimg.cc/gj34x6fq/images-1.jpg' },
-                        { text: 'Monsoon', image: 'https://i.postimg.cc/Qt9frzmz/images-2.jpg' },
-                        { text: 'Spring', image: 'https://i.postimg.cc/1RFvCLfn/images-3.jpg' }
-                    ]
-                },
-                {
-                    q: (name) => `What is ${name}'s favorite snack?`,
-                    options: [
-                        { text: 'Cake', image: 'https://i.postimg.cc/6qFz3fjQ/images-5.jpg' },
-                        { text: 'Samosa', image: 'https://i.postimg.cc/GpjMQY2M/images-4.jpg' },
-                        { text: 'Golgappe', image: 'https://i.postimg.cc/440WBXfT/images-6.jpg' },
-                        { text: 'Pakode', image: 'https://i.postimg.cc/DzHyk953/images-7.jpg' }
-                    ]
-                },
-                {
-                    q: (name) => `What is ${name}'s Hobby?`,
-                    options: [
-                        { text: 'Cricket', image: 'https://i.postimg.cc/YqkvcWqN/images-10.jpg' },
-                        { text: 'Mobile', image: 'https://i.postimg.cc/vZZDTwnc/images-11.jpg' },
-                        { text: 'Reading', image: 'https://i.postimg.cc/T1jhLRQW/images-8.jpg' },
-                        { text: 'Gaming', image: 'https://i.postimg.cc/xTRc91cw/images-9.jpg' }
-                    ]
-                }
+            const defaultQuestions = [
+                { q: (name) => `What is ${name}'s favorite color?`, options: [ { text: 'Red', image: 'https://i.postimg.cc/P5B29s4x/red.png' }, { text: 'Blue', image: 'https://i.postimg.cc/C1QCSkG1/blue.png' }, { text: 'White', image: 'https://i.postimg.cc/d1yY2W9L/white.jpg' }, { text: 'Black', image: 'https://i.postimg.cc/tJ019Rk7/black.jpg' } ] },
+                { q: (name) => `What is ${name}'s favorite season?`, options: [ { text: 'Summer', image: 'https://i.postimg.cc/7LQKd437/images.jpg' }, { text: 'Winter', image: 'https://i.postimg.cc/gj34x6fq/images-1.jpg' }, { text: 'Monsoon', image: 'https://i.postimg.cc/Qt9frzmz/images-2.jpg' }, { text: 'Spring', image: 'https://i.postimg.cc/1RFvCLfn/images-3.jpg' } ] },
+                { q: (name) => `What is ${name}'s favorite snack?`, options: [ { text: 'Cake', image: 'https://i.postimg.cc/6qFz3fjQ/images-5.jpg' }, { text: 'Samosa', image: 'https://i.postimg.cc/GpjMQY2M/images-4.jpg' }, { text: 'Golgappe', image: 'https://i.postimg.cc/440WBXfT/images-6.jpg' }, { text: 'Pakode', image: 'https://i.postimg.cc/DzHyk953/images-7.jpg' } ] },
+                { q: (name) => `What is ${name}'s Hobby?`, options: [ { text: 'Cricket', image: 'https://i.postimg.cc/YqkvcWqN/images-10.jpg' }, { text: 'Mobile', image: 'https://i.postimg.cc/vZZDTwnc/images-11.jpg' }, { text: 'Reading', image: 'https://i.postimg.cc/T1jhLRQW/images-8.jpg' }, { text: 'Gaming', image: 'https://i.postimg.cc/xTRc91cw/images-9.jpg' } ] }
             ];
             
             let currentQuestionIndex, userAnswers, quizMode, userName, friendName, quizData;
             let currentQuizId = null;
+            let questions = [];
 
             const params = new URLSearchParams(window.location.search);
             const quizIdFromUrl = params.get('quizId');
@@ -259,6 +233,7 @@
                 if (docSnap.exists()) {
                     quizData = docSnap.data();
                     userName = quizData.creatorName;
+                    questions = quizData.questions; // Already in standardized format
                     quizMode = 'friend';
                     document.getElementById('friend-prompt-heading').innerText = `You've been challenged by ${userName}!`;
                     namePage.classList.add('hidden');
@@ -272,10 +247,46 @@
             startBtn.addEventListener('click', () => {
                 userName = nameInput.value.trim();
                 if (userName) {
+                    // Standardize default questions
+                    questions = defaultQuestions.map(q => ({
+                        question: q.q(userName),
+                        options: q.options
+                    }));
                     quizMode = 'creator';
                     namePage.classList.add('hidden');
                     startQuiz();
                 } else { alert('Please enter your name!'); }
+            });
+            
+            aiGenerateBtn.addEventListener('click', async () => {
+                userName = nameInput.value.trim();
+                if (!userName) {
+                    alert('Please enter your name first!');
+                    return;
+                }
+                const theme = prompt("Enter a theme for your quiz (e.g., 'my favorite movies', 'my personality'):");
+                if (!theme) return;
+                
+                aiGenerateBtn.disabled = true;
+                aiGenerateBtn.innerText = "Generating...";
+
+                try {
+                    const generatedQuestions = await generateAiQuestions(theme, userName);
+                    // Standardize AI questions
+                    questions = generatedQuestions.map(q => ({
+                        question: q.question,
+                        options: q.options.map(opt => ({ text: opt, image: `https://placehold.co/150x150/cccccc/000000?text=${encodeURIComponent(opt)}` }))
+                    }));
+                    quizMode = 'creator';
+                    namePage.classList.add('hidden');
+                    startQuiz();
+                } catch (error) {
+                    console.error("Error generating AI questions:", error);
+                    alert("Sorry, couldn't generate AI questions. Please try again.");
+                } finally {
+                    aiGenerateBtn.disabled = false;
+                    aiGenerateBtn.innerText = "✨ Generate AI Questions";
+                }
             });
 
             startFriendQuizBtn.addEventListener('click', () => {
@@ -296,7 +307,8 @@
                     leaderboardModal.classList.add('hidden');
                 }
             });
-
+            
+            aiAnalysisBtn.addEventListener('click', getAiAnalysis);
 
             function startQuiz() {
                 currentQuestionIndex = 0;
@@ -315,10 +327,10 @@
                 document.getElementById('progress-text').innerText = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
                 const questionData = questions[currentQuestionIndex];
                 const questionContainer = document.getElementById('question-container');
-                let qText = quizMode === 'creator' ? questionData.q('your') : questionData.q(userName);
+                const qText = questionData.question; // Always a string now
                 let optionsHTML = `<div class="options-grid">`;
                 questionData.options.forEach((opt, i) => {
-                    optionsHTML += `<div class="option-card" data-index="${i}"><img src="${opt.image}" alt="${opt.text}"><span>${opt.text}</span></div>`;
+                    optionsHTML += `<div class="option-card" data-index="${i}"><img src="${opt.image}" alt="${opt.text}" onerror="this.onerror=null;this.src='https://placehold.co/150x150/cccccc/000000?text=Image';"><span>${opt.text}</span></div>`;
                 });
                 optionsHTML += '</div>';
                 questionContainer.innerHTML = `<p>${qText}</p>${optionsHTML}`;
@@ -347,6 +359,7 @@
                     const docRef = await addDoc(collection(db, "quizzes"), {
                         creatorName: userName,
                         answers: answersString,
+                        questions: questions, // Already in standardized format
                         createdAt: new Date()
                     });
                     currentQuizId = docRef.id;
@@ -371,7 +384,7 @@
                 questions.forEach((q, i) => {
                     const isCorrect = userAnswers[i] === correctAnswers[i];
                     if (isCorrect) score++;
-                    resultsHTML += `<li class="${isCorrect ? 'correct' : 'wrong'}"><p>${q.q(userName)}</p><p>You guessed: <b>${q.options[userAnswers[i]].text}</b> ${isCorrect ? '✔' : `✖ (Correct: <b>${q.options[correctAnswers[i]].text}</b>)`}</p></li>`;
+                    resultsHTML += `<li class="${isCorrect ? 'correct' : 'wrong'}"><p>${q.question}</p><p>You guessed: <b>${q.options[userAnswers[i]].text}</b> ${isCorrect ? '✔' : `✖ (Correct: <b>${q.options[correctAnswers[i]].text}</b>)`}</p></li>`;
                 });
                 resultsHTML += '</ul>';
                 
@@ -379,6 +392,7 @@
                 document.getElementById('results-heading').innerText = `Here's your result, ${friendName}!`;
                 document.getElementById('score').innerHTML = `You scored <b>${score} out of ${questions.length}</b>.`;
                 resultsPage.classList.remove('hidden');
+                aiAnalysisBtn.classList.remove('hidden');
                 
                 try {
                     await addDoc(collection(db, "quizzes", currentQuizId, "leaderboard"), {
@@ -390,32 +404,34 @@
                     console.error("Error adding to leaderboard: ", e);
                 }
 
+                document.getElementById('leaderboard-section').classList.remove('hidden');
                 displayLeaderboard('leaderboard', 'leaderboard-loader');
             }
 
             async function displayLeaderboard(listId, loaderId) {
-                const leaderboardSection = document.getElementById('leaderboard-section');
                 const loader = document.getElementById(loaderId);
-                if (leaderboardSection) leaderboardSection.classList.remove('hidden');
-                loader.classList.remove('hidden');
-
                 const leaderboardList = document.getElementById(listId);
-                leaderboardList.innerHTML = ''; // Clear previous entries
+                
+                loader.classList.remove('hidden');
+                leaderboardList.innerHTML = '';
 
-                const q = query(collection(db, "quizzes", currentQuizId, "leaderboard"));
+                const q = query(
+                    collection(db, "quizzes", currentQuizId, "leaderboard"), 
+                    orderBy("score", "desc"), 
+                    orderBy("createdAt", "asc")
+                );
                 
                 try {
                     const querySnapshot = await getDocs(q);
-                    
-                    let attendees = [];
+                    const attendees = [];
                     querySnapshot.forEach((doc) => {
                         attendees.push(doc.data());
                     });
 
-                    attendees.sort((a, b) => b.score - a.score || a.createdAt.seconds - b.createdAt.seconds);
+                    const totalQuestions = quizData.questions.length;
                     
                     if (attendees.length > 0) {
-                        leaderboardList.innerHTML = attendees.map(p => `<li><span>${p.name}</span><span>${p.score}/${questions.length}</span></li>`).join('');
+                        leaderboardList.innerHTML = attendees.map(p => `<li><span>${p.name}</span><span>${p.score}/${totalQuestions}</span></li>`).join('');
                     } else {
                         leaderboardList.innerHTML = '<li>No one has taken this quiz yet. Be the first!</li>';
                     }
@@ -426,6 +442,87 @@
                      loader.classList.add('hidden');
                 }
             }
+            
+            async function generateAiQuestions(theme, name) {
+                const apiKey = ""; 
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                
+                const prompt = `Generate 4 multiple-choice quiz questions for a friendship quiz about a person named ${name}. The theme is "${theme}". The questions should be phrased as if asking a friend, like "What is ${name}'s favorite...". Each question must have exactly 4 options. One of the options should be a plausible "correct" answer.`;
+
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseMimeType: "application/json",
+                        responseSchema: {
+                            type: "OBJECT",
+                            properties: {
+                                "questions": {
+                                    type: "ARRAY",
+                                    items: {
+                                        type: "OBJECT",
+                                        properties: {
+                                            "question": { "type": "STRING" },
+                                            "options": { "type": "ARRAY", "items": { "type": "STRING" } }
+                                        },
+                                        required: ["question", "options"]
+                                    }
+                                }
+                            },
+                             required: ["questions"]
+                        }
+                    }
+                };
+
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error(`API call failed with status: ${response.status}`);
+                const result = await response.json();
+                const jsonText = result.candidates[0].content.parts[0].text;
+                return JSON.parse(jsonText).questions;
+            }
+            
+            async function getAiAnalysis() {
+                aiAnalysisBtn.disabled = true;
+                aiAnalysisBtn.innerText = "Analyzing...";
+                aiAnalysisBox.classList.remove('hidden');
+                aiAnalysisBox.innerHTML = '<div class="loader"></div>';
+
+                const score = document.getElementById('score').innerText;
+                const resultsText = Array.from(document.querySelectorAll('#results-container li')).map(li => li.innerText).join('\n');
+
+                const prompt = `Act as a fun and friendly "Friendship Guru". A person named ${friendName} just took a friendship quiz about their friend, ${userName}.
+                Their result was: "${score}".
+                Here are the detailed results (question, their guess, and correct answer if wrong):
+                ${resultsText}
+
+                Based on this, write a short, playful, and encouraging analysis (2-3 sentences) of their friendship. Be positive and fun!`;
+
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+                const payload = { contents: [{ parts: [{ text: prompt }] }] };
+
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(`API call failed with status: ${response.status}`);
+                    const result = await response.json();
+                    const analysisText = result.candidates[0].content.parts[0].text;
+                    aiAnalysisBox.innerHTML = analysisText;
+                } catch (error) {
+                    console.error("Error getting AI analysis:", error);
+                    aiAnalysisBox.innerHTML = "Sorry, couldn't get the friendship analysis right now.";
+                } finally {
+                     aiAnalysisBtn.classList.add('hidden');
+                }
+            }
+
       });
     </script>
 </body>
