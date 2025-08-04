@@ -167,7 +167,7 @@
 
             const questions = [
                 {
-                    q: (name) => What is ${name}'s favorite color?,
+                    q: (name) => `What is ${name}'s favorite color?`,
                     options: [
                         { text: 'Red', image: 'https://i.postimg.cc/P5B29s4x/red.png' },
                         { text: 'Blue', image: 'https://i.postimg.cc/C1QCSkG1/blue.png' },
@@ -176,7 +176,7 @@
                     ]
                 },
                 {
-                    q: (name) => What is ${name}'s favorite season?,
+                    q: (name) => `What is ${name}'s favorite season?`,
                     options: [
                         { text: 'Summer', image: 'https://i.postimg.cc/7LQKd437/images.jpg' },
                         { text: 'Winter', image: 'https://i.postimg.cc/gj34x6fq/images-1.jpg' },
@@ -185,7 +185,7 @@
                     ]
                 },
                 {
-                    q: (name) => What is ${name}'s favorite snack?,
+                    q: (name) => `What is ${name}'s favorite snack?`,
                     options: [
                         { text: 'Cake', image: 'https://i.postimg.cc/6qFz3fjQ/images-5.jpg' },
                         { text: 'Samosa', image: 'https://i.postimg.cc/GpjMQY2M/images-4.jpg' },
@@ -194,7 +194,7 @@
                     ]
                 },
                 {
-                    q: (name) => What is ${name}'s Hobby?,
+                    q: (name) => `What is ${name}'s Hobby?`,
                     options: [
                         { text: 'Cricket', image: 'https://i.postimg.cc/YqkvcWqN/images-10.jpg' },
                         { text: 'Mobile', image: 'https://i.postimg.cc/vZZDTwnc/images-11.jpg' },
@@ -223,7 +223,7 @@
                     quizData = docSnap.data();
                     userName = quizData.creatorName;
                     quizMode = 'friend';
-                    document.getElementById('friend-prompt-heading').innerText = You've been challenged by ${userName}!;
+                    document.getElementById('friend-prompt-heading').innerText = `You've been challenged by ${userName}!`;
                     namePage.classList.add('hidden');
                     friendNamePage.classList.remove('hidden');
                 } else {
@@ -262,17 +262,17 @@
                     return;
                 }
                 const progress = ((currentQuestionIndex) / questions.length) * 100;
-                document.querySelector('.progress-bar-inner').style.width = ${progress}%;
-                document.getElementById('progress-text').innerText = Question ${currentQuestionIndex + 1} of ${questions.length};
+                document.querySelector('.progress-bar-inner').style.width = `${progress}%`;
+                document.getElementById('progress-text').innerText = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
                 const questionData = questions[currentQuestionIndex];
                 const questionContainer = document.getElementById('question-container');
                 let qText = quizMode === 'creator' ? questionData.q('your') : questionData.q(userName);
-                let optionsHTML = <div class="options-grid">;
+                let optionsHTML = `<div class="options-grid">`;
                 questionData.options.forEach((opt, i) => {
-                    optionsHTML += <div class="option-card" data-index="${i}"><img src="${opt.image}" alt="${opt.text}"><span>${opt.text}</span></div>;
+                    optionsHTML += `<div class="option-card" data-index="${i}"><img src="${opt.image}" alt="${opt.text}"><span>${opt.text}</span></div>`;
                 });
                 optionsHTML += '</div>';
-                questionContainer.innerHTML = <p>${qText}</p>${optionsHTML};
+                questionContainer.innerHTML = `<p>${qText}</p>${optionsHTML}`;
                 document.querySelectorAll('.option-card').forEach(c => c.addEventListener('click', handleOptionSelect));
             }
 
@@ -290,7 +290,7 @@
             async function finishCreatorQuiz() {
                 const shareButton = document.getElementById('whatsapp-share-btn');
                 shareButton.disabled = true;
-                document.getElementById('share-heading').innerText = Generating your quiz...;
+                document.getElementById('share-heading').innerText = `Generating your quiz...`;
                 sharePage.classList.remove('hidden');
                 
                 const answersString = userAnswers.join('');
@@ -302,11 +302,11 @@
                     });
                     currentQuizId = docRef.id;
                     
-                    document.getElementById('share-heading').innerText = ${userName}, Your Quiz is Ready!;
-                    const link = ${window.location.origin}${window.location.pathname}?quizId=${currentQuizId};
+                    document.getElementById('share-heading').innerText = `${userName}, Your Quiz is Ready!`;
+                    const link = `${window.location.origin}${window.location.pathname}?quizId=${currentQuizId}`;
                     document.getElementById('share-link-container').innerText = link;
-                    const whatsappMsg = encodeURIComponent(${userName} has challenged you to a friendship quiz! 🤔 See if you really know them. Click the link: ${link});
-                    shareButton.href = https://api.whatsapp.com/send?text=${whatsappMsg};
+                    const whatsappMsg = encodeURIComponent(`${userName} has challenged you to a friendship quiz! 🤔 See if you really know them. Click the link: ${link}`);
+                    shareButton.href = `https://api.whatsapp.com/send?text=${whatsappMsg}`;
                     shareButton.disabled = false;
 
                 } catch (e) {
@@ -322,13 +322,13 @@
                 questions.forEach((q, i) => {
                     const isCorrect = userAnswers[i] === correctAnswers[i];
                     if (isCorrect) score++;
-                    resultsHTML += `<li class="${isCorrect ? 'correct' : 'wrong'}"><p>${q.q(userName)}</p><p>You guessed: <b>${q.options[userAnswers[i]].text}</b> ${isCorrect ? '✔' : ✖ (Correct: <b>${q.options[correctAnswers[i]].text}</b>)}</p></li>`;
+                    resultsHTML += `<li class="${isCorrect ? 'correct' : 'wrong'}"><p>${q.q(userName)}</p><p>You guessed: <b>${q.options[userAnswers[i]].text}</b> ${isCorrect ? '✔' : `✖ (Correct: <b>${q.options[correctAnswers[i]].text}</b>)`}</p></li>`;
                 });
                 resultsHTML += '</ul>';
                 
                 document.getElementById('results-container').innerHTML = resultsHTML;
-                document.getElementById('results-heading').innerText = Here's your result, ${friendName}!;
-                document.getElementById('score').innerHTML = You scored <b>${score} out of ${questions.length}</b>.;
+                document.getElementById('results-heading').innerText = `Here's your result, ${friendName}!`;
+                document.getElementById('score').innerHTML = `You scored <b>${score} out of ${questions.length}</b>.`;
                 resultsPage.classList.remove('hidden');
                 
                 try {
@@ -361,7 +361,7 @@
 
                 attendees.sort((a, b) => b.score - a.score || a.createdAt - b.createdAt);
                 
-                leaderboardList.innerHTML = attendees.map(p => <li><span>${p.name}</span><span>${p.score}/${questions.length}</span></li>).join('');
+                leaderboardList.innerHTML = attendees.map(p => `<li><span>${p.name}</span><span>${p.score}/${questions.length}</span></li>`).join('');
                 loader.classList.add('hidden');
             }
       });
