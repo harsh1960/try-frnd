@@ -39,6 +39,13 @@
         .btn:hover:not(:disabled) { background-color: #2980b9; }
         .btn-share { background-color: var(--secondary-color); }
         .btn-share:hover:not(:disabled) { background-color: #27ae60; }
+        .btn-secondary {
+            background-color: transparent;
+            color: var(--primary-color);
+            border: 2px solid var(--primary-color);
+        }
+        .btn-secondary:hover:not(:disabled) { background-color: #eaf5fc; }
+
         #quiz-page { text-align: left; }
         .progress-container { margin-bottom: 20px; }
         .progress-bar { width: 100%; background-color: var(--border-color); border-radius: 5px; height: 10px; }
@@ -62,19 +69,36 @@
         #results-container li { background-color: #f8f9f9; padding: 15px; margin-bottom: 10px; border-radius: 8px; border-left: 5px solid; }
         .correct { border-left-color: var(--secondary-color) !important; }
         .wrong { border-left-color: var(--danger-color) !important; }
-        #leaderboard { list-style-type: none; padding: 0; }
-        #leaderboard li {
+        .leaderboard-list { list-style-type: none; padding: 0; }
+        .leaderboard-list li {
             background: #fdfaf2; border: 1px solid #fdeec9; border-radius: 8px;
             padding: 10px 15px; margin-bottom: 8px; font-weight: bold;
             display: flex; justify-content: space-between; align-items: center;
         }
-        #leaderboard li:first-child { background-color: var(--gold-color); color: var(--white-color); border-color: #d4a20b; }
+        .leaderboard-list li:first-child { background-color: var(--gold-color); color: var(--white-color); border-color: #d4a20b; }
         .hidden { display: none; }
         .loader {
             border: 4px solid #f3f3f3; border-radius: 50%; border-top: 4px solid var(--primary-color);
             width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto;
         }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Modal Styles */
+        .modal {
+            position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%;
+            overflow: auto; background-color: rgba(0,0,0,0.5);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .modal-content {
+            background-color: #fefefe; margin: auto; padding: 20px;
+            border: 1px solid #888; width: 90%; max-width: 500px;
+            border-radius: 10px; position: relative;
+        }
+        .close-btn {
+            color: #aaa; float: right; font-size: 28px; font-weight: bold;
+            position: absolute; top: 10px; right: 20px;
+        }
+        .close-btn:hover, .close-btn:focus { color: black; text-decoration: none; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -94,6 +118,7 @@
             <p>Enter your name to start the quiz!</p>
             <input type="text" id="friend-name-input" class="input-field" placeholder="Enter Your Name">
             <button id="start-friend-quiz-btn" class="btn">Take the Quiz!</button>
+            <button id="view-leaderboard-btn" class="btn btn-secondary">View Leaderboard</button>
         </div>
 
         <!-- Page 2: The Quiz -->
@@ -123,7 +148,7 @@
             
             <div id="leaderboard-section" class="hidden">
                 <h3>🏆 Leaderboard</h3>
-                <ul id="leaderboard"></ul>
+                <ul id="leaderboard" class="leaderboard-list"></ul>
                 <div id="leaderboard-loader" class="loader hidden"></div>
             </div>
             
@@ -133,12 +158,21 @@
         </div>
     </div>
 
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="modal hidden">
+        <div class="modal-content">
+            <span id="close-modal-btn" class="close-btn">&times;</span>
+            <h3>🏆 Leaderboard</h3>
+            <ul id="modal-leaderboard-list" class="leaderboard-list"></ul>
+            <div id="modal-leaderboard-loader" class="loader hidden"></div>
+        </div>
+    </div>
+
     <!-- Firebase SDK -->
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
       import { getFirestore, collection, doc, setDoc, getDoc, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-      // Your web app's Firebase configuration
       const firebaseConfig = {
         apiKey: "AIzaSyAoh37dJCcFjw9Lce8xKvHBpKm7TqYep2M",
         authDomain: "aidata-1d74f.firebaseapp.com",
@@ -148,7 +182,6 @@
         appId: "1:12946555542:web:a733c78857d9da5633b8b7"
       };
 
-      // Initialize Firebase
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
 
@@ -164,6 +197,10 @@
             const friendNameInput = document.getElementById('friend-name-input');
             const startBtn = document.getElementById('start-btn');
             const startFriendQuizBtn = document.getElementById('start-friend-quiz-btn');
+            
+            const viewLeaderboardBtn = document.getElementById('view-leaderboard-btn');
+            const leaderboardModal = document.getElementById('leaderboard-modal');
+            const closeModalBtn = document.getElementById('close-modal-btn');
 
             const questions = [
                 {
@@ -248,6 +285,18 @@
                     startQuiz();
                 } else { alert('Please enter your name!'); }
             });
+
+            viewLeaderboardBtn.addEventListener('click', () => {
+                leaderboardModal.classList.remove('hidden');
+                displayLeaderboard('modal-leaderboard-list', 'modal-leaderboard-loader');
+            });
+            closeModalBtn.addEventListener('click', () => leaderboardModal.classList.add('hidden'));
+            window.addEventListener('click', (event) => {
+                if (event.target == leaderboardModal) {
+                    leaderboardModal.classList.add('hidden');
+                }
+            });
+
 
             function startQuiz() {
                 currentQuestionIndex = 0;
@@ -341,28 +390,41 @@
                     console.error("Error adding to leaderboard: ", e);
                 }
 
-                displayLeaderboard();
+                displayLeaderboard('leaderboard', 'leaderboard-loader');
             }
 
-            async function displayLeaderboard() {
+            async function displayLeaderboard(listId, loaderId) {
                 const leaderboardSection = document.getElementById('leaderboard-section');
-                const loader = document.getElementById('leaderboard-loader');
-                leaderboardSection.classList.remove('hidden');
+                const loader = document.getElementById(loaderId);
+                if (leaderboardSection) leaderboardSection.classList.remove('hidden');
                 loader.classList.remove('hidden');
 
-                const leaderboardList = document.getElementById('leaderboard');
-                const q = query(collection(db, "quizzes", currentQuizId, "leaderboard"));
-                const querySnapshot = await getDocs(q);
-                
-                let attendees = [];
-                querySnapshot.forEach((doc) => {
-                    attendees.push(doc.data());
-                });
+                const leaderboardList = document.getElementById(listId);
+                leaderboardList.innerHTML = ''; // Clear previous entries
 
-                attendees.sort((a, b) => b.score - a.score || a.createdAt - b.createdAt);
+                const q = query(collection(db, "quizzes", currentQuizId, "leaderboard"));
                 
-                leaderboardList.innerHTML = attendees.map(p => `<li><span>${p.name}</span><span>${p.score}/${questions.length}</span></li>`).join('');
-                loader.classList.add('hidden');
+                try {
+                    const querySnapshot = await getDocs(q);
+                    
+                    let attendees = [];
+                    querySnapshot.forEach((doc) => {
+                        attendees.push(doc.data());
+                    });
+
+                    attendees.sort((a, b) => b.score - a.score || a.createdAt.seconds - b.createdAt.seconds);
+                    
+                    if (attendees.length > 0) {
+                        leaderboardList.innerHTML = attendees.map(p => `<li><span>${p.name}</span><span>${p.score}/${questions.length}</span></li>`).join('');
+                    } else {
+                        leaderboardList.innerHTML = '<li>No one has taken this quiz yet. Be the first!</li>';
+                    }
+                } catch (e) {
+                    console.error("Error fetching leaderboard: ", e);
+                    leaderboardList.innerHTML = '<li>Could not load leaderboard.</li>';
+                } finally {
+                     loader.classList.add('hidden');
+                }
             }
       });
     </script>
